@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Weekly Predictions</title>
+    <!-- Include Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Bootstrap CSS for styling -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css">
+    <style>
+        body { background-color: #f8f9fa; }
+        .container { max-width: 900px; }
+        .table-container { max-height: 200px; overflow-y: auto; }
+        .btn-group { margin-bottom: 10px; }
+        .prediction-card { padding: 15px; background: #fff; border-radius: 8px; box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1); }
+    </style>
+</head>
+<body>
+
+<div class="container mt-4">
+    <h1 class="text-center">📊 Weekly Predictions</h1>
+
+    <!-- Buttons to select which week's prediction to display -->
+    <div class="btn-group d-flex justify-content-center">
+        <button type="button" class="btn btn-primary" onclick="getPrediction('week_1')">Week 1</button>
+        <button type="button" class="btn btn-primary" onclick="getPrediction('week_2')">Week 2</button>
+        <button type="button" class="btn btn-primary" onclick="getPrediction('week_3')">Week 3</button>
+        <button type="button" class="btn btn-primary" onclick="getPrediction('week_4')">Week 4</button>
+    </div>
+
+    <!-- Download CSV Buttons -->
+    <div class="btn-group d-flex justify-content-center">
+        <button class="btn btn-success" onclick="downloadCSV(1)">Download Week 1</button>
+        <button class="btn btn-success" onclick="downloadCSV(2)">Download Week 2</button>
+        <button class="btn btn-success" onclick="downloadCSV(3)">Download Week 3</button>
+        <button class="btn btn-success" onclick="downloadCSV(4)">Download Week 4</button>
+    </div>
+
+    <!-- Analyze & Download Buttons -->
+    <div class="d-flex justify-content-center">
+        <button class="btn btn-warning my-2" onclick="analyzeData()">📊 Analyze Data</button>
+        <button class="btn btn-danger my-2 ml-2" onclick="downloadAll()">📂 Download All</button>
+    </div>
+
+    <!-- Prediction Data -->
+    <div id="predictionContainer" class="prediction-card">
+        <h3 id="predictionTitle"></h3>
+        <div class="table-container">
+            <table class="table table-bordered">
+                <thead>
+                    <tr>
+                        <th>Time Step</th>
+                        <th>Electricity Power (kW)</th>
+                    </tr>
+                </thead>
+                <tbody id="predictionOutput"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Analysis Table -->
+    <div class="mt-3">
+        <h3>📊 Analysis Report</h3>
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Week</th>
+                    <th>Mean</th>
+                    <th>Min</th>
+                    <th>Max</th>
+                </tr>
+            </thead>
+            <tbody id="analysisOutput"></tbody>
+        </table>
+    </div>
+
+    <!-- Trend Analysis -->
+    <div class="mt-3">
+        <h3>📈 Trend Analysis (Increase/Decrease from Previous Week)</h3>
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Week</th>
+                    <th>Mean Change</th>
+                    <th>Min Change</th>
+                    <th>Max Change</th>
+                </tr>
+            </thead>
+            <tbody id="trendOutput"></tbody>
+        </table>
+    </div>
+
+    <!-- Graph -->
+    <canvas id="predictionChart" width="800" height="400"></canvas>
+</div>
+
+<script>
+    let chart;
+
+    async function getPrediction(week) {
+        try {
+            const response = await fetch('/predict');
+            const data = await response.json();
+            const predictions = data[week];
+
+            document.getElementById('predictionTitle').innerText = week.replace('_', ' ') + " Predictions";
+            
+            let tableRows = predictions.map((value, index) => `<tr><td>${index + 1}</td><td>${value.toFixed(2)}</td></tr>`).join('');
+            document.getElementById('predictionOutput').innerHTML = tableRows;
+
+            const labels = predictions.map((_, index) => index + 1);
+
+            if (chart) {
+                chart.data.labels = labels;
+                chart.data.datasets[0].data = predictions;
+                chart.update();
+            } else {
+                const ctx = document.getElementById('predictionChart').getContext('2d');
+                chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Electricity Power (kW)',
+                            data: predictions,
+                            borderColor: 'rgba(0, 123, 255, 1)',
+                            backgroundColor: 'rgba(0, 123, 255, 0.2)',
+                            borderWidth: 2,
+                            fill: true,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: {
+                            x: { title: { display: true, text: 'Time Step' } },
+                            y: { title: { display: true, text: 'Electricity Power (kW)' } }
+                        }
+                    }
+                });
+            }
+        } catch (error) {
+            console.error('Error fetching predictions:', error);
+        }
+    }
+
+    function downloadCSV(week) {
+        window.location.href = `/download/${week}`;
+    }
+
+    function downloadAll() {
+        window.location.href = '/download_all';
+    }
+
+    async function analyzeData() {
+        try {
+            const response = await fetch('/analyze');
+            const analysis = await response.json();
+
+            let analysisTable = analysis.map(item => 
+                `<tr>
+                    <td>${item.Week}</td>
+                    <td>${item.Mean.toFixed(2)}</td>
+                    <td>${item.Min.toFixed(2)}</td>
+                    <td>${item.Max.toFixed(2)}</td>
+                </tr>`).join('');
+
+            document.getElementById('analysisOutput').innerHTML = analysisTable;
+            
+            // Calculate trend analysis
+            let trendTable = '';
+            for (let i = 1; i < analysis.length; i++) {
+                let prev = analysis[i - 1];
+                let current = analysis[i];
+
+                let meanChange = (current.Mean - prev.Mean).toFixed(2);
+                let minChange = (current.Min - prev.Min).toFixed(2);
+                let maxChange = (current.Max - prev.Max).toFixed(2);
+
+                trendTable += `
+                    <tr>
+                        <td>Week ${i + 1}</td>
+                        <td style="color: ${meanChange >= 0 ? 'green' : 'red'}">${meanChange} kW</td>
+                        <td style="color: ${minChange >= 0 ? 'green' : 'red'}">${minChange} kW</td>
+                        <td style="color: ${maxChange >= 0 ? 'green' : 'red'}">${maxChange} kW</td>
+                    </tr>
+                `;
+            }
+            document.getElementById('trendOutput').innerHTML = trendTable;
+
+        } catch (error) {
+            console.error("Error analyzing data:", error);
+        }
+    }
+</script>
+
+</body>
+</html>
