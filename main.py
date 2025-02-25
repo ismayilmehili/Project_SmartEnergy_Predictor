@@ -1,4 +1,5 @@
-from app import app  # Import the Flask instance from app.py
+# main.py
+from app import app
 import os
 
 if __name__ == '__main__':
