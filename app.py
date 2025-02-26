@@ -5,25 +5,38 @@ from flask import Flask, jsonify, render_template, request, send_file
 import tensorflow as tf
 from sklearn.preprocessing import MinMaxScaler
 
-# Import update functions from update.py
-from update import update_model, predict_next_month
+# Import functions from update.py
+from update import update_model, predict_next_month, update_model_monthly, predict_next_monthly, preprocess_data_monthly_custom
 
-# Set up the templates folder
+# Set up Flask and template folder
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
 app = Flask(__name__, template_folder=TEMPLATE_DIR)
-app.secret_key = 'supersecretkey'  # Needed for flashing messages
+app.secret_key = 'supersecretkey'
 
 print("✅ Flask is using template folder:", TEMPLATE_DIR)
 
-# Load the saved model once when the app starts
+# Load weekly model
 model = tf.keras.models.load_model('saved_model.h5')
-print("Model loaded successfully.")
+print("Weekly model loaded successfully.")
 
-# --- Existing Prediction Endpoint ---
+# Load monthly model
+monthly_model = tf.keras.models.load_model('monthly_model.h5')
+print("Monthly model loaded successfully.")
+
+# ---------------------- Helper Function for Weekly ----------------------
 def preprocess_data(file_path, input_steps=168, output_steps=168):
     data = pd.read_csv(file_path, skiprows=7)
-    data.columns = ["Timestamp", "Electricity Power (kW)", "Air Pressure Power (kW)", "Air Consumption (kW)"]
+    if data.shape[1] == 4:
+        data.columns = ["Timestamp", "Electricity Power (kW)", "Air Pressure Power (kW)", "Air Consumption (kW)"]
+    elif data.shape[1] == 2:
+        data.columns = ["Timestamp", "Electricity Power (kW)"]
+        data["Air Pressure Power (kW)"] = 0
+        data["Air Consumption (kW)"] = 0
+    else:
+        data = data.iloc[:, :4]
+        data.columns = ["Timestamp", "Electricity Power (kW)", "Air Pressure Power (kW)", "Air Consumption (kW)"]
+
     data['Timestamp'] = pd.to_datetime(data['Timestamp'])
     data = data[data['Timestamp'].dt.minute == 0]
     data['Hour'] = data['Timestamp'].dt.hour
@@ -44,17 +57,28 @@ def preprocess_data(file_path, input_steps=168, output_steps=168):
     for i in range(len(X_scaled) - input_steps - output_steps + 1):
         X_seq.append(X_scaled[i:i+input_steps])
         y_seq.append(y_scaled[i+input_steps:i+input_steps+output_steps].flatten())
-    X_seq = np.array(X_seq)
-    y_seq = np.array(y_seq)
-    return X_seq, y_seq, scaler_y
+    return np.array(X_seq), np.array(y_seq), scaler_y
 
+# ---------------------- Main Navigation Routes ----------------------
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+@app.route('/weekly')
+def weekly_page():
+    return render_template('weekly.html')
+
+@app.route('/monthly')
+def monthly_page():
+    return render_template('monthly.html')
+
+# ---------------------- Weekly Endpoints ----------------------
 @app.route('/predict', methods=['GET'])
 def predict():
     file_path = 'Energy_2022-2024_testing_data.csv'
     input_steps = 168
     output_steps = 168
 
-    # Preprocess data and generate predictions
     X, _, scaler_y = preprocess_data(file_path, input_steps, output_steps)
     n_features = X.shape[2]
     predictions = {}
@@ -106,7 +130,6 @@ def analyze():
 def download_analysis():
     return send_file("analysis_report.csv", as_attachment=True)
 
-# --- Revised CSV Upload Endpoint ---
 @app.route('/upload', methods=['POST'])
 def upload():
     if 'file' not in request.files:
@@ -118,10 +141,8 @@ def upload():
         os.makedirs('uploads', exist_ok=True)
         file_path = os.path.join('uploads', file.filename)
         file.save(file_path)
-        # Update the model using the uploaded CSV
         updated_model, scaler_y, X_seq = update_model(file_path)
         predictions = predict_next_month(updated_model, scaler_y, X_seq)
-        # Write the current predictions to the CSV file for download endpoints
         all_data = []
         for week_num in range(4):
             week_key = f'week_{week_num+1}'
@@ -133,10 +154,56 @@ def upload():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/')
-def index():
-    # The main page now loads without prediction numbers.
-    return render_template('index.html')
+# ---------------------- Monthly Endpoints ----------------------
+@app.route('/predict_monthly', methods=['GET'])
+def predict_monthly():
+    file_path = 'Energy_2022-2024_testing_data.csv'
+    input_steps = 720
+    output_steps = 720
+
+    # Use the custom monthly preprocessing function
+    X, _, scaler_y = preprocess_data_monthly_custom(file_path, input_steps, output_steps)
+    if X.shape[0] == 0:
+        return jsonify({"error": "Not enough data for monthly predictions. At least {} rows required.".format(input_steps + output_steps)})
+    n_features = X.shape[2]
+    X_input = X[-1].reshape(1, input_steps, n_features)
+    pred = monthly_model.predict(X_input)
+    pred_rescaled = scaler_y.inverse_transform(pred)
+    prediction = pred_rescaled.flatten().tolist()
+    df = pd.DataFrame({
+        "Time Step": range(1, output_steps+1),
+        "Predicted Electricity Power (kW)": prediction
+    })
+    df.to_csv("monthly_predictions.csv", index=False)
+    return jsonify({"monthly_prediction": prediction})
+
+@app.route('/download_monthly')
+def download_monthly():
+    return send_file("monthly_predictions.csv", as_attachment=True)
+
+@app.route('/upload_monthly', methods=['POST'])
+def upload_monthly():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part in the request"}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No file selected for uploading"}), 400
+    try:
+        os.makedirs('uploads', exist_ok=True)
+        file_path = os.path.join('uploads', file.filename)
+        file.save(file_path)
+        updated_model, scaler_y, X_seq = update_model_monthly(file_path)
+        if X_seq.shape[0] == 0:
+            return jsonify({"error": "Not enough data for monthly prediction update. At least {} rows required.".format(720+720)})
+        prediction = predict_next_monthly(updated_model, scaler_y, X_seq)
+        df = pd.DataFrame({
+            "Time Step": range(1, len(prediction)+1),
+            "Predicted Electricity Power (kW)": prediction
+        })
+        df.to_csv("monthly_predictions.csv", index=False)
+        return jsonify({"monthly_prediction": prediction})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
     print("🚀 Starting Flask server... Access it at: http://127.0.0.1:5001/")

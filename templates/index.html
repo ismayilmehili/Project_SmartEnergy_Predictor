@@ -1,292 +1,79 @@
-<!-- templates/index.html -->
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="utf-8">
-    <title>Weekly Predictions</title>
-    <!-- Include Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Bootstrap CSS for styling -->
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css">
-    <style>
-        body { background-color: #f8f9fa; }
-        .container { max-width: 900px; }
-        .table-container { max-height: 200px; overflow-y: auto; }
-        .btn-group { margin-bottom: 10px; }
-        .prediction-card { padding: 15px; background: #fff; border-radius: 8px; box-shadow: 2px 2px 10px rgba(0, 0, 0, 0.1); }
-        #uploadSection { margin-bottom: 20px; padding: 15px; background: #e9ecef; border-radius: 8px; }
-        /* Spinner styling */
-        #loadingSpinner {
-            display: none;
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            z-index: 9999;
-        }
-    </style>
+  <meta charset="utf-8">
+  <title>Main Page - Predictions Dashboard</title>
+  <!-- Bootstrap CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css">
+  <!-- Google Fonts (optional) -->
+  <link href="https://fonts.googleapis.com/css?family=Roboto:400,700&display=swap" rel="stylesheet">
+  <style>
+    body {
+      background: url('https://source.unsplash.com/1600x900/?data,technology') no-repeat center center fixed;
+      background-size: cover;
+      font-family: 'Roboto', sans-serif;
+      color: #fff;
+    }
+    .overlay {
+      background-color: rgba(0, 0, 0, 0.6);
+      min-height: 100vh;
+      padding-top: 50px;
+    }
+    .container {
+      text-align: center;
+    }
+    .nav-btn {
+      margin: 20px;
+      padding: 20px 40px;
+      font-size: 1.2rem;
+      border-radius: 50px;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .nav-btn:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 12px rgba(0,0,0,0.2);
+    }
+    h1 {
+      font-weight: 700;
+      margin-bottom: 20px;
+    }
+    p {
+      font-size: 1.1rem;
+      margin-bottom: 40px;
+    }
+    .analysis-img {
+      max-width: 100%;
+      height: auto;
+      margin: 40px 0;
+      border: 5px solid rgba(255,255,255,0.7);
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+    .analysis-caption {
+      font-size: 1.1rem;
+      margin-bottom: 40px;
+    }
+  </style>
 </head>
 <body>
-<div class="container mt-4">
-    <h1 class="text-center">📊 Weekly Predictions</h1>
-
-    <!-- Upload Section (integrated into main page) -->
-    <div id="uploadSection">
-        <h4>Upload New CSV Data to Update Model</h4>
-        <form id="uploadForm" enctype="multipart/form-data">
-            <div class="form-group">
-                <input type="file" id="csvFile" accept=".csv" class="form-control-file" required>
-            </div>
-            <button type="submit" class="btn btn-info">Upload and Update Model</button>
-        </form>
+  <div class="overlay">
+    <div class="container">
+      <h1>Welcome to the Predictions Dashboard</h1>
+      <p>Select one of the following sections to see your predictions:</p>
+      <div>
+        <a href="/weekly" class="btn btn-primary nav-btn">Weekly Predictions</a>
+        <a href="/monthly" class="btn btn-secondary nav-btn">Monthly Predictions</a>
+      </div>
+      <!-- Analysis Image Section in the middle -->
+      <div class="mt-5">
+        <img src="/static/analysis.webp" alt="Statistical Analysis" class="analysis-img">
+        <p class="analysis-caption">Explore trends and insights with our statistical analysis.</p>
+      </div>
     </div>
-
-    <!-- Loading Spinner -->
-    <div id="loadingSpinner">
-        <div class="spinner-border text-primary" role="status">
-            <span class="sr-only">Loading...</span>
-        </div>
-        <p class="text-center">Updating model, please wait...</p>
-    </div>
-
-    <!-- Buttons for selecting weeks -->
-    <div class="btn-group d-flex justify-content-center mb-3">
-        <button type="button" class="btn btn-primary" onclick="getPrediction('week_1')">Week 1</button>
-        <button type="button" class="btn btn-primary" onclick="getPrediction('week_2')">Week 2</button>
-        <button type="button" class="btn btn-primary" onclick="getPrediction('week_3')">Week 3</button>
-        <button type="button" class="btn btn-primary" onclick="getPrediction('week_4')">Week 4</button>
-    </div>
-
-    <!-- Download CSV Buttons -->
-    <div class="btn-group d-flex justify-content-center mb-3">
-        <button class="btn btn-success" onclick="downloadCSV(1)">Download Week 1</button>
-        <button class="btn btn-success" onclick="downloadCSV(2)">Download Week 2</button>
-        <button class="btn btn-success" onclick="downloadCSV(3)">Download Week 3</button>
-        <button class="btn btn-success" onclick="downloadCSV(4)">Download Week 4</button>
-    </div>
-
-    <!-- Analyze & Download Buttons -->
-    <div class="d-flex justify-content-center mb-3">
-        <button class="btn btn-warning" onclick="analyzeData()">📊 Analyze Data</button>
-        <button class="btn btn-danger ml-2" onclick="downloadAll()">📂 Download All</button>
-    </div>
-
-    <!-- Prediction Data Display (initially empty) -->
-    <div id="predictionContainer" class="prediction-card">
-        <h3 id="predictionTitle"></h3>
-        <div class="table-container">
-            <table class="table table-bordered">
-                <thead>
-                    <tr>
-                        <th>Time Step</th>
-                        <th>Electricity Power (kW)</th>
-                    </tr>
-                </thead>
-                <tbody id="predictionOutput"></tbody>
-            </table>
-        </div>
-    </div>
-
-    <!-- Analysis Report -->
-    <div class="mt-3">
-        <h3>📊 Analysis Report</h3>
-        <table class="table table-bordered">
-            <thead>
-                <tr>
-                    <th>Week</th>
-                    <th>Mean</th>
-                    <th>Min</th>
-                    <th>Max</th>
-                </tr>
-            </thead>
-            <tbody id="analysisOutput"></tbody>
-        </table>
-    </div>
-
-    <!-- Trend Analysis -->
-    <div class="mt-3">
-        <h3>📈 Trend Analysis (Increase/Decrease from Previous Week)</h3>
-        <table class="table table-bordered">
-            <thead>
-                <tr>
-                    <th>Week</th>
-                    <th>Mean Change</th>
-                    <th>Min Change</th>
-                    <th>Max Change</th>
-                </tr>
-            </thead>
-            <tbody id="trendOutput"></tbody>
-        </table>
-    </div>
-
-    <!-- Graph -->
-    <canvas id="predictionChart" width="800" height="400"></canvas>
-</div>
-
-<script>
-    let chart;
-    // This variable holds the latest predictions (either from /predict or after a CSV upload)
-    let currentPredictions = null;
-
-    async function getPrediction(week) {
-        let predictions;
-        if (currentPredictions) {
-            predictions = currentPredictions;
-        } else {
-            try {
-                const response = await fetch('/predict');
-                predictions = await response.json();
-            } catch (error) {
-                console.error('Error fetching predictions:', error);
-                return;
-            }
-        }
-        const preds = predictions[week];
-        document.getElementById('predictionTitle').innerText = week.replace('_', ' ') + " Predictions";
-        let tableRows = preds.map((value, index) => `<tr><td>${index + 1}</td><td>${value.toFixed(2)}</td></tr>`).join('');
-        document.getElementById('predictionOutput').innerHTML = tableRows;
-        const labels = preds.map((_, index) => index + 1);
-        if (chart) {
-            chart.data.labels = labels;
-            chart.data.datasets[0].data = preds;
-            chart.update();
-        } else {
-            const ctx = document.getElementById('predictionChart').getContext('2d');
-            chart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Electricity Power (kW)',
-                        data: preds,
-                        borderColor: 'rgba(0, 123, 255, 1)',
-                        backgroundColor: 'rgba(0, 123, 255, 0.2)',
-                        borderWidth: 2,
-                        fill: true,
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    scales: {
-                        x: { title: { display: true, text: 'Time Step' } },
-                        y: { title: { display: true, text: 'Electricity Power (kW)' } }
-                    }
-                }
-            });
-        }
-    }
-
-    function downloadCSV(week) {
-        window.location.href = `/download/${week}`;
-    }
-
-    function downloadAll() {
-        window.location.href = '/download_all';
-    }
-
-    async function analyzeData() {
-        try {
-            const response = await fetch('/analyze');
-            const analysis = await response.json();
-            let analysisTable = analysis.map(item => 
-                `<tr>
-                    <td>${item.Week}</td>
-                    <td>${item.Mean.toFixed(2)}</td>
-                    <td>${item.Min.toFixed(2)}</td>
-                    <td>${item.Max.toFixed(2)}</td>
-                </tr>`).join('');
-            document.getElementById('analysisOutput').innerHTML = analysisTable;
-            let trendTable = '';
-            for (let i = 1; i < analysis.length; i++) {
-                let prev = analysis[i - 1];
-                let current = analysis[i];
-                let meanChange = (current.Mean - prev.Mean).toFixed(2);
-                let minChange = (current.Min - prev.Min).toFixed(2);
-                let maxChange = (current.Max - prev.Max).toFixed(2);
-                trendTable += `
-                    <tr>
-                        <td>Week ${i + 1}</td>
-                        <td style="color: ${meanChange >= 0 ? 'green' : 'red'}">${meanChange} kW</td>
-                        <td style="color: ${minChange >= 0 ? 'green' : 'red'}">${minChange} kW</td>
-                        <td style="color: ${maxChange >= 0 ? 'green' : 'red'}">${maxChange} kW</td>
-                    </tr>
-                `;
-            }
-            document.getElementById('trendOutput').innerHTML = trendTable;
-        } catch (error) {
-            console.error("Error analyzing data:", error);
-        }
-    }
-
-    // Handle CSV upload without leaving the page and show/hide loading spinner
-    document.getElementById('uploadForm').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        // Show loading spinner
-        document.getElementById('loadingSpinner').style.display = 'block';
-        const fileInput = document.getElementById('csvFile');
-        if(fileInput.files.length === 0){
-            alert("Please select a CSV file to upload.");
-            document.getElementById('loadingSpinner').style.display = 'none';
-            return;
-        }
-        const formData = new FormData();
-        formData.append('file', fileInput.files[0]);
-        try {
-            const response = await fetch('/upload', { method: 'POST', body: formData });
-            const result = await response.json();
-            if (result.error) {
-                alert("Error: " + result.error);
-            } else {
-                // Save new predictions and update the display (for example, show week_1 by default)
-                currentPredictions = result;
-                updatePredictions(result);
-            }
-        } catch(err) {
-            console.error(err);
-            alert("Error uploading file.");
-        } finally {
-            // Hide loading spinner
-            document.getElementById('loadingSpinner').style.display = 'none';
-        }
-    });
-
-    function updatePredictions(predictions) {
-        // Update the predictions section using the new data (defaulting to week_1)
-        const week = 'week_1';
-        const preds = predictions[week];
-        document.getElementById('predictionTitle').innerText = week.replace('_', ' ') + " Predictions (Updated)";
-        let tableRows = preds.map((value, index) => `<tr><td>${index + 1}</td><td>${value.toFixed(2)}</td></tr>`).join('');
-        document.getElementById('predictionOutput').innerHTML = tableRows;
-        const labels = preds.map((_, index) => index + 1);
-        if (chart) {
-            chart.data.labels = labels;
-            chart.data.datasets[0].data = preds;
-            chart.update();
-        } else {
-            const ctx = document.getElementById('predictionChart').getContext('2d');
-            chart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Electricity Power (kW)',
-                        data: preds,
-                        borderColor: 'rgba(0, 123, 255, 1)',
-                        backgroundColor: 'rgba(0, 123, 255, 0.2)',
-                        borderWidth: 2,
-                        fill: true,
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    scales: {
-                        x: { title: { display: true, text: 'Time Step' } },
-                        y: { title: { display: true, text: 'Electricity Power (kW)' } }
-                    }
-                }
-            });
-        }
-    }
-</script>
+  </div>
+  <!-- Optional JavaScript -->
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>
