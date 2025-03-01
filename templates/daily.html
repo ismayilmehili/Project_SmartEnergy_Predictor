@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Daily Predictions</title>
+  <!-- Bootstrap CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { 
+      background-color: #f8f9fa; 
+      font-family: 'Roboto', sans-serif;
+    }
+    .container { 
+      max-width: 900px; 
+      margin-top: 30px;
+    }
+    .card {
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      border: none;
+      margin-bottom: 20px;
+    }
+    #uploadSection {
+      padding: 20px;
+      background: #e9ecef;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    #tableContainer {
+      max-height: 300px; 
+      overflow-y: auto; 
+      border: 1px solid #dee2e6; 
+      border-radius: 4px; 
+      background: #fff;
+    }
+    #loadingSpinner {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 9999;
+      text-align: center;
+    }
+    .spinner-border {
+      width: 3rem;
+      height: 3rem;
+    }
+    .nav-link {
+      font-size: 1rem;
+    }
+    footer {
+      margin-top: 40px;
+      font-size: 0.9rem;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+    <div class="container">
+      <a class="navbar-brand" href="/">Predictions Dashboard</a>
+      <div class="collapse navbar-collapse">
+        <ul class="navbar-nav ml-auto">
+          <li class="nav-item">
+            <a class="nav-link" href="/">Home</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="my-4">
+      <h1 class="text-center">📅 Daily Predictions</h1>
+    </div>
+    
+    <!-- Upload Section -->
+    <div id="uploadSection">
+      <h4>Upload CSV Data to Update Daily Model</h4>
+      <form id="uploadFormDaily" enctype="multipart/form-data">
+        <div class="form-group">
+          <input type="file" id="csvFileDaily" accept=".csv" class="form-control-file" required>
+        </div>
+        <button type="submit" class="btn btn-info">Upload and Update Model</button>
+      </form>
+    </div>
+    
+    <!-- Day Selector -->
+    <div class="form-group">
+      <label for="daySelector"><strong>Select Day to View Predictions:</strong></label>
+      <select id="daySelector" class="form-control" onchange="updateTableAndChart()">
+        <!-- Options will be dynamically populated -->
+      </select>
+    </div>
+    
+    <!-- Prediction Table -->
+    <div id="tableContainer" class="mb-4">
+      <table class="table table-striped mb-0">
+        <thead class="thead-light">
+          <tr>
+            <th>Hour</th>
+            <th>Prediction (kW)</th>
+          </tr>
+        </thead>
+        <tbody id="predictionTable">
+          <!-- Data rows inserted dynamically -->
+        </tbody>
+      </table>
+    </div>
+    
+    <!-- Download Buttons -->
+    <div class="text-center mb-3">
+      <button class="btn btn-success" onclick="downloadCSV()">Download CSV for Selected Day</button>
+      <button class="btn btn-warning" onclick="downloadAllDailyCSV()">Download All Predictions (Month)</button>
+    </div>
+    
+    <!-- Get Predictions Button -->
+    <div class="text-center mb-4">
+      <button class="btn btn-primary" onclick="getDailyPrediction()">Get Daily Prediction for Next Month</button>
+    </div>
+    
+    <!-- Chart Section -->
+    <div class="card">
+      <div class="card-body">
+        <canvas id="dailyChart" width="800" height="400"></canvas>
+      </div>
+    </div>
+  </div>
+  
+  <!-- Loading Spinner -->
+  <div id="loadingSpinner">
+    <div class="spinner-border text-primary" role="status">
+      <span class="sr-only">Loading...</span>
+    </div>
+    <p class="mt-2">Updating model, please wait...</p>
+  </div>
+
+  <footer class="text-center">
+    <div class="container">
+      &copy; 2025 Predictions Dashboard. All rights reserved.
+    </div>
+  </footer>
+  
+  <!-- Optional JavaScript -->
+  <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.bundle.min.js"></script>
+  
+  <!-- The existing script remains unchanged -->
+  <script>
+    let dailyPredictions = {};
+    let dailyChart;
+    
+    async function getDailyPrediction() {
+      try {
+        const response = await fetch('/predict_daily');
+        const predictions = await response.json();
+        if (predictions.error) {
+          alert("Error: " + predictions.error);
+          return;
+        }
+        dailyPredictions = predictions;
+        populateDaySelector();
+        updateTableAndChart();
+      } catch (error) {
+        console.error('Error fetching daily prediction:', error);
+        alert("Error fetching daily prediction.");
+      }
+    }
+    
+    function populateDaySelector() {
+      const selector = document.getElementById('daySelector');
+      selector.innerHTML = "";
+      const keys = Object.keys(dailyPredictions).sort((a, b) => {
+        return Number(a.split('_')[1]) - Number(b.split('_')[1]);
+      });
+      keys.forEach(dayKey => {
+        const option = document.createElement('option');
+        option.value = dayKey;
+        option.text = dayKey.replace('_', ' ').toUpperCase();
+        selector.appendChild(option);
+      });
+    }
+    
+    function updateTableAndChart() {
+      updateTable();
+      updateChart();
+    }
+    
+    function updateTable() {
+      const selectedDay = document.getElementById('daySelector').value;
+      const preds = dailyPredictions[selectedDay];
+      let tableHTML = "";
+      for (let i = 0; i < preds.length; i++) {
+        tableHTML += `<tr><td>${i+1}</td><td>${preds[i].toFixed(2)}</td></tr>`;
+      }
+      document.getElementById('predictionTable').innerHTML = tableHTML;
+    }
+    
+    function updateChart() {
+      const selectedDay = document.getElementById('daySelector').value;
+      const preds = dailyPredictions[selectedDay];
+      const labels = Array.from({length: preds.length}, (_, i) => i+1);
+      const ctx = document.getElementById('dailyChart').getContext('2d');
+      if (dailyChart) {
+        dailyChart.data.labels = labels;
+        dailyChart.data.datasets[0].data = preds;
+        dailyChart.update();
+      } else {
+        dailyChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: 'Electricity Power (kW)',
+              data: preds,
+              borderColor: 'rgba(75, 192, 192, 1)',
+              backgroundColor: 'rgba(75, 192, 192, 0.2)',
+              borderWidth: 2,
+              fill: true,
+            }]
+          },
+          options: {
+            responsive: true,
+            scales: {
+              x: { title: { display: true, text: 'Hour' } },
+              y: { title: { display: true, text: 'Electricity Power (kW)' } }
+            }
+          }
+        });
+      }
+    }
+    
+    function downloadCSV() {
+      const selectedDay = document.getElementById('daySelector').value;
+      const preds = dailyPredictions[selectedDay];
+      let csvContent = "data:text/csv;charset=utf-8,Hour,Electricity Power (kW)\n";
+      preds.forEach((val, idx) => {
+        csvContent += `${idx+1},${val}\n`;
+      });
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", selectedDay + "_predictions.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+    
+    function downloadAllDailyCSV() {
+      let csvContent = "data:text/csv;charset=utf-8,Day,Hour,Electricity Power (kW)\n";
+      const keys = Object.keys(dailyPredictions).sort((a, b) => Number(a.split('_')[1]) - Number(b.split('_')[1]));
+      keys.forEach(dayKey => {
+        const preds = dailyPredictions[dayKey];
+        preds.forEach((val, idx) => {
+          csvContent += `${dayKey},${idx+1},${val}\n`;
+        });
+      });
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", "all_daily_predictions.csv");
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+    
+    document.getElementById('daySelector').addEventListener('change', updateTableAndChart);
+    
+    document.getElementById('uploadFormDaily').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      document.getElementById('loadingSpinner').style.display = 'block';
+      const fileInput = document.getElementById('csvFileDaily');
+      if(fileInput.files.length === 0){
+        alert("Please select a CSV file to upload.");
+        document.getElementById('loadingSpinner').style.display = 'none';
+        return;
+      }
+      const formData = new FormData();
+      formData.append('file', fileInput.files[0]);
+      try {
+        const response = await fetch('/upload_daily', { method: 'POST', body: formData });
+        const result = await response.json();
+        if(result.error){
+          alert("Error: " + result.error);
+        } else {
+          getDailyPrediction();
+        }
+      } catch (error) {
+        console.error("Error uploading file:", error);
+        alert("Error uploading file.");
+      } finally {
+        document.getElementById('loadingSpinner').style.display = 'none';
+      }
+    });
+  </script>
+</body>
+</html>

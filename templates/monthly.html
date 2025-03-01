@@ -1,175 +1,247 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="utf-8">
-    <title>Monthly Predictions</title>
-    <!-- Include Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Bootstrap CSS -->
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css">
-    <style>
-        body { background-color: #f8f9fa; }
-        .container { max-width: 900px; }
-        .table-container { max-height: 200px; overflow-y: auto; }
-        .prediction-card { padding: 15px; background: #fff; border-radius: 8px; box-shadow: 2px 2px 10px rgba(0,0,0,0.1); }
-        #uploadSection { margin-bottom: 20px; padding: 15px; background: #e9ecef; border-radius: 8px; }
-        #loadingSpinner { display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 9999; }
-        .nav-link { margin-top: 20px; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Monthly Predictions</title>
+  <!-- Bootstrap CSS -->
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css">
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { 
+      background-color: #f8f9fa; 
+      font-family: 'Roboto', sans-serif;
+    }
+    .container { 
+      max-width: 900px; 
+      margin-top: 30px;
+    }
+    .card {
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      border: none;
+      margin-bottom: 20px;
+    }
+    #uploadSection {
+      padding: 20px;
+      background: #e9ecef;
+      border-radius: 8px;
+      margin-bottom: 20px;
+    }
+    .table-container {
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    #loadingSpinner {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 9999;
+      text-align: center;
+    }
+    .spinner-border {
+      width: 3rem;
+      height: 3rem;
+    }
+    footer {
+      margin-top: 40px;
+      font-size: 0.9rem;
+      color: #666;
+    }
+  </style>
 </head>
 <body>
-<div class="container mt-4">
-    <h1 class="text-center">📊 Monthly Predictions</h1>
+  <!-- Navbar -->
+  <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm">
+    <div class="container">
+      <a class="navbar-brand" href="/">Predictions Dashboard</a>
+      <div class="collapse navbar-collapse">
+        <ul class="navbar-nav ml-auto">
+          <li class="nav-item">
+            <a class="nav-link" href="/">Home</a>
+          </li>
+        </ul>
+      </div>
+    </div>
+  </nav>
+  
+  <div class="container mt-4">
+    <h1 class="text-center mb-4">📊 Monthly Predictions</h1>
+    
     <div class="text-center mb-3">
-        <a href="/" class="btn btn-primary nav-link">Back to Main Page</a>
+      <a href="/" class="btn btn-primary">Back to Main Page</a>
     </div>
+    
+    <!-- Upload Section -->
     <div id="uploadSection">
-        <h4>Upload New CSV Data to Update Monthly Model</h4>
-        <form id="uploadFormMonthly" enctype="multipart/form-data">
-            <div class="form-group">
-                <input type="file" id="csvFileMonthly" accept=".csv" class="form-control-file" required>
-            </div>
-            <button type="submit" class="btn btn-info">Upload and Update Monthly Model</button>
-        </form>
-    </div>
-    <div class="btn-group d-flex justify-content-center mb-3">
-        <button type="button" class="btn btn-secondary" onclick="getMonthlyPrediction()">Get Monthly Prediction</button>
-        <button class="btn btn-success" onclick="downloadMonthly()">Download Monthly Predictions</button>
-    </div>
-    <div id="predictionContainer" class="prediction-card">
-        <h3 id="predictionTitle"></h3>
-        <div class="table-container">
-            <table class="table table-bordered">
-                <thead>
-                    <tr>
-                        <th>Time Step</th>
-                        <th>Electricity Power (kW)</th>
-                    </tr>
-                </thead>
-                <tbody id="predictionOutput"></tbody>
-            </table>
+      <h4>Upload CSV Data to Update Monthly Model</h4>
+      <form id="uploadFormMonthly" enctype="multipart/form-data">
+        <div class="form-group">
+          <input type="file" id="csvFileMonthly" accept=".csv" class="form-control-file" required>
         </div>
+        <button type="submit" class="btn btn-info">Upload and Update Model</button>
+      </form>
     </div>
-    <canvas id="predictionChart" width="800" height="400"></canvas>
-</div>
-<div id="loadingSpinner">
+    
+    <div class="btn-group d-flex justify-content-center mb-3">
+      <button type="button" class="btn btn-secondary" onclick="getMonthlyPrediction()">Get Monthly Prediction</button>
+      <button class="btn btn-success" onclick="downloadMonthly()">Download Monthly Predictions</button>
+    </div>
+    
+    <div id="predictionContainer" class="card p-3 mb-4">
+      <h3 id="predictionTitle"></h3>
+      <div class="table-container">
+        <table class="table table-bordered mb-0">
+          <thead class="thead-light">
+            <tr>
+              <th>Time Step</th>
+              <th>Electricity Power (kW)</th>
+            </tr>
+          </thead>
+          <tbody id="predictionOutput">
+            <!-- Prediction rows inserted dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+    
+    <div class="card">
+      <div class="card-body">
+        <canvas id="predictionChart" width="800" height="400"></canvas>
+      </div>
+    </div>
+  </div>
+  
+  <div id="loadingSpinner">
     <div class="spinner-border text-primary" role="status">
-        <span class="sr-only">Loading...</span>
+      <span class="sr-only">Loading...</span>
     </div>
-    <p class="text-center">Updating model, please wait...</p>
-</div>
-<script>
+    <p class="mt-2">Updating model, please wait...</p>
+  </div>
+  
+  <footer class="text-center">
+    <div class="container">
+      &copy; 2025 Predictions Dashboard. All rights reserved.
+    </div>
+  </footer>
+  
+  <script>
     let chart;
     async function getMonthlyPrediction() {
-        try {
-            const response = await fetch('/predict_monthly');
-            const result = await response.json();
-            if(result.error){
-                alert(result.error);
-                return;
-            }
-            const preds = result.monthly_prediction;
-            document.getElementById('predictionTitle').innerText = "Monthly Predictions";
-            let tableRows = preds.map((value, index) => `<tr><td>${index+1}</td><td>${value.toFixed(2)}</td></tr>`).join('');
-            document.getElementById('predictionOutput').innerHTML = tableRows;
-            const labels = preds.map((_, index) => index+1);
-            if (chart) {
-                chart.data.labels = labels;
-                chart.data.datasets[0].data = preds;
-                chart.update();
-            } else {
-                const ctx = document.getElementById('predictionChart').getContext('2d');
-                chart = new Chart(ctx, {
-                    type: 'line',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            label: 'Electricity Power (kW)',
-                            data: preds,
-                            borderColor: 'rgba(255, 99, 132, 1)',
-                            backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                            borderWidth: 2,
-                            fill: true,
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        scales: {
-                            x: { title: { display: true, text: 'Time Step' } },
-                            y: { title: { display: true, text: 'Electricity Power (kW)' } }
-                        }
-                    }
-                });
-            }
-        } catch (error) {
-            console.error('Error fetching monthly prediction:', error);
+      try {
+        const response = await fetch('/predict_monthly');
+        const result = await response.json();
+        if(result.error){
+          alert(result.error);
+          return;
         }
-    }
-    function downloadMonthly() {
-        window.location.href = '/download_monthly';
-    }
-    document.getElementById('uploadFormMonthly').addEventListener('submit', async function(e) {
-        e.preventDefault();
-        document.getElementById('loadingSpinner').style.display = 'block';
-        const fileInput = document.getElementById('csvFileMonthly');
-        if(fileInput.files.length === 0){
-            alert("Please select a CSV file to upload.");
-            document.getElementById('loadingSpinner').style.display = 'none';
-            return;
-        }
-        const formData = new FormData();
-        formData.append('file', fileInput.files[0]);
-        try {
-            const response = await fetch('/upload_monthly', { method: 'POST', body: formData });
-            const result = await response.json();
-            if (result.error) {
-                alert("Error: " + result.error);
-            } else {
-                updateMonthlyPredictions(result.monthly_prediction);
-            }
-        } catch(err) {
-            console.error(err);
-            alert("Error uploading file.");
-        } finally {
-            document.getElementById('loadingSpinner').style.display = 'none';
-        }
-    });
-    function updateMonthlyPredictions(predictions) {
-        document.getElementById('predictionTitle').innerText = "Monthly Predictions (Updated)";
-        let tableRows = predictions.map((value, index) => `<tr><td>${index+1}</td><td>${value.toFixed(2)}</td></tr>`).join('');
+        const preds = result.monthly_prediction;
+        document.getElementById('predictionTitle').innerText = "Monthly Predictions";
+        let tableRows = preds.map((value, index) => `<tr><td>${index+1}</td><td>${value.toFixed(2)}</td></tr>`).join('');
         document.getElementById('predictionOutput').innerHTML = tableRows;
-        const labels = predictions.map((_, index) => index+1);
+        const labels = preds.map((_, index) => index+1);
         if (chart) {
-            chart.data.labels = labels;
-            chart.data.datasets[0].data = predictions;
-            chart.data.datasets[0].borderColor = 'rgba(255, 99, 132, 1)';
-            chart.data.datasets[0].backgroundColor = 'rgba(255, 99, 132, 0.2)';
-            chart.update();
+          chart.data.labels = labels;
+          chart.data.datasets[0].data = preds;
+          chart.update();
         } else {
-            const ctx = document.getElementById('predictionChart').getContext('2d');
-            chart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Electricity Power (kW)',
-                        data: predictions,
-                        borderColor: 'rgba(255, 99, 132, 1)',
-                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
-                        borderWidth: 2,
-                        fill: true,
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    scales: {
-                        x: { title: { display: true, text: 'Time Step' } },
-                        y: { title: { display: true, text: 'Electricity Power (kW)' } }
-                    }
-                }
-            });
+          const ctx = document.getElementById('predictionChart').getContext('2d');
+          chart = new Chart(ctx, {
+            type: 'line',
+            data: {
+              labels: labels,
+              datasets: [{
+                label: 'Electricity Power (kW)',
+                data: preds,
+                borderColor: 'rgba(255, 99, 132, 1)',
+                backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                borderWidth: 2,
+                fill: true,
+              }]
+            },
+            options: {
+              responsive: true,
+              scales: {
+                x: { title: { display: true, text: 'Time Step' } },
+                y: { title: { display: true, text: 'Electricity Power (kW)' } }
+              }
+            }
+          });
         }
+      } catch (error) {
+        console.error('Error fetching monthly prediction:', error);
+      }
     }
-</script>
+    
+    function downloadMonthly() {
+      window.location.href = '/download_monthly';
+    }
+    
+    document.getElementById('uploadFormMonthly').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      document.getElementById('loadingSpinner').style.display = 'block';
+      const fileInput = document.getElementById('csvFileMonthly');
+      if(fileInput.files.length === 0){
+        alert("Please select a CSV file to upload.");
+        document.getElementById('loadingSpinner').style.display = 'none';
+        return;
+      }
+      const formData = new FormData();
+      formData.append('file', fileInput.files[0]);
+      try {
+        const response = await fetch('/upload_monthly', { method: 'POST', body: formData });
+        const result = await response.json();
+        if (result.error) {
+          alert("Error: " + result.error);
+        } else {
+          updateMonthlyPredictions(result.monthly_prediction);
+        }
+      } catch(err) {
+        console.error(err);
+        alert("Error uploading file.");
+      } finally {
+        document.getElementById('loadingSpinner').style.display = 'none';
+      }
+    });
+    
+    function updateMonthlyPredictions(predictions) {
+      document.getElementById('predictionTitle').innerText = "Monthly Predictions (Updated)";
+      let tableRows = predictions.map((value, index) => `<tr><td>${index+1}</td><td>${value.toFixed(2)}</td></tr>`).join('');
+      document.getElementById('predictionOutput').innerHTML = tableRows;
+      const labels = predictions.map((_, index) => index+1);
+      if (chart) {
+        chart.data.labels = labels;
+        chart.data.datasets[0].data = predictions;
+        chart.data.datasets[0].borderColor = 'rgba(255, 99, 132, 1)';
+        chart.data.datasets[0].backgroundColor = 'rgba(255, 99, 132, 0.2)';
+        chart.update();
+      } else {
+        const ctx = document.getElementById('predictionChart').getContext('2d');
+        chart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: 'Electricity Power (kW)',
+              data: predictions,
+              borderColor: 'rgba(255, 99, 132, 1)',
+              backgroundColor: 'rgba(255, 99, 132, 0.2)',
+              borderWidth: 2,
+              fill: true,
+            }]
+          },
+          options: {
+            responsive: true,
+            scales: {
+              x: { title: { display: true, text: 'Time Step' } },
+              y: { title: { display: true, text: 'Electricity Power (kW)' } }
+            }
+          }
+        });
+      }
+    }
+  </script>
 </body>
 </html>
