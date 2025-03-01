@@ -4,11 +4,16 @@ import numpy as np
 from flask import Flask, jsonify, render_template, request, send_file
 import tensorflow as tf
 from sklearn.preprocessing import MinMaxScaler
+from datetime import timedelta
 
-# Import functions from update.py
-from update import update_model, predict_next_month, update_model_monthly, predict_next_monthly, preprocess_data_monthly_custom
+# Import helper functions from update.py
+from update import (
+    preprocess_data, preprocess_data_monthly_custom,
+    update_model, predict_next_month,
+    update_model_monthly, predict_next_monthly,
+    preprocess_data_daily, update_model_daily, predict_next_month_daily
+)
 
-# Set up Flask and template folder
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE_DIR = os.path.join(BASE_DIR, "templates")
 app = Flask(__name__, template_folder=TEMPLATE_DIR)
@@ -16,50 +21,18 @@ app.secret_key = 'supersecretkey'
 
 print("✅ Flask is using template folder:", TEMPLATE_DIR)
 
-# Load weekly model
-model = tf.keras.models.load_model('saved_model.h5')
+# Load models
+weekly_model = tf.keras.models.load_model('saved_model.h5')
 print("Weekly model loaded successfully.")
 
-# Load monthly model
 monthly_model = tf.keras.models.load_model('monthly_model.h5')
 print("Monthly model loaded successfully.")
 
-# ---------------------- Helper Function for Weekly ----------------------
-def preprocess_data(file_path, input_steps=168, output_steps=168):
-    data = pd.read_csv(file_path, skiprows=7)
-    if data.shape[1] == 4:
-        data.columns = ["Timestamp", "Electricity Power (kW)", "Air Pressure Power (kW)", "Air Consumption (kW)"]
-    elif data.shape[1] == 2:
-        data.columns = ["Timestamp", "Electricity Power (kW)"]
-        data["Air Pressure Power (kW)"] = 0
-        data["Air Consumption (kW)"] = 0
-    else:
-        data = data.iloc[:, :4]
-        data.columns = ["Timestamp", "Electricity Power (kW)", "Air Pressure Power (kW)", "Air Consumption (kW)"]
+daily_model = tf.keras.models.load_model('daily_energy_prediction_model.h5',
+                                         custom_objects={'mse': tf.keras.losses.mse})
+print("Daily model loaded successfully.")
 
-    data['Timestamp'] = pd.to_datetime(data['Timestamp'])
-    data = data[data['Timestamp'].dt.minute == 0]
-    data['Hour'] = data['Timestamp'].dt.hour
-    data['DayOfWeek'] = data['Timestamp'].dt.dayofweek
-    data['Month'] = data['Timestamp'].dt.month
-    data['Electricity Power (Lag1)'] = data['Electricity Power (kW)'].shift(1)
-    data['Electricity Power (Lag2)'] = data['Electricity Power (kW)'].shift(2)
-    data.dropna(inplace=True)
-    features = ['Electricity Power (kW)', 'Air Pressure Power (kW)', 'Air Consumption (kW)',
-                'Hour', 'DayOfWeek', 'Month', 'Electricity Power (Lag1)', 'Electricity Power (Lag2)']
-    X_data = data[features].values
-    y_data = data[['Electricity Power (kW)']].values
-    scaler_X = MinMaxScaler(feature_range=(0, 1))
-    scaler_y = MinMaxScaler(feature_range=(0, 1))
-    X_scaled = scaler_X.fit_transform(X_data)
-    y_scaled = scaler_y.fit_transform(y_data)
-    X_seq, y_seq = [], []
-    for i in range(len(X_scaled) - input_steps - output_steps + 1):
-        X_seq.append(X_scaled[i:i+input_steps])
-        y_seq.append(y_scaled[i+input_steps:i+input_steps+output_steps].flatten())
-    return np.array(X_seq), np.array(y_seq), scaler_y
-
-# ---------------------- Main Navigation Routes ----------------------
+# ---------------------- Main Navigation ----------------------
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -72,21 +45,25 @@ def weekly_page():
 def monthly_page():
     return render_template('monthly.html')
 
+@app.route('/daily')
+def daily_page():
+    return render_template('daily.html')
+
 # ---------------------- Weekly Endpoints ----------------------
 @app.route('/predict', methods=['GET'])
 def predict():
     file_path = 'Energy_2022-2024_testing_data.csv'
     input_steps = 168
     output_steps = 168
-
     X, _, scaler_y = preprocess_data(file_path, input_steps, output_steps)
     n_features = X.shape[2]
     predictions = {}
     all_data = []
     for week_num in range(4):
         X_input = X[-(4 - week_num)].reshape(1, input_steps, n_features)
-        pred = model.predict(X_input)
+        pred = weekly_model.predict(X_input)
         pred_rescaled = scaler_y.inverse_transform(pred)
+        pred_rescaled[pred_rescaled < 0] = 0  # Clamp negatives to zero
         week_data = pred_rescaled.flatten().tolist()
         predictions[f'week_{week_num+1}'] = week_data
         all_data.append({"Week": f"Week {week_num+1}", "Predictions": week_data})
@@ -117,10 +94,10 @@ def analyze():
     for week in weeks:
         week_data = data[data["Week"] == week]
         if not week_data.empty:
-            predictions = eval(week_data["Predictions"].values[0])
-            mean_val = np.mean(predictions)
-            min_val = np.min(predictions)
-            max_val = np.max(predictions)
+            preds = eval(week_data["Predictions"].values[0])
+            mean_val = np.mean(preds)
+            min_val = np.min(preds)
+            max_val = np.max(preds)
             analysis_results.append({"Week": week, "Mean": mean_val, "Min": min_val, "Max": max_val})
     df_analysis = pd.DataFrame(analysis_results)
     df_analysis.to_csv("analysis_report.csv", index=False)
@@ -160,15 +137,14 @@ def predict_monthly():
     file_path = 'Energy_2022-2024_testing_data.csv'
     input_steps = 720
     output_steps = 720
-
-    # Use the custom monthly preprocessing function
     X, _, scaler_y = preprocess_data_monthly_custom(file_path, input_steps, output_steps)
     if X.shape[0] == 0:
-        return jsonify({"error": "Not enough data for monthly predictions. At least {} rows required.".format(input_steps + output_steps)})
+        return jsonify({"error": f"Not enough data for monthly predictions. Need at least {input_steps+output_steps} rows."})
     n_features = X.shape[2]
     X_input = X[-1].reshape(1, input_steps, n_features)
     pred = monthly_model.predict(X_input)
     pred_rescaled = scaler_y.inverse_transform(pred)
+    pred_rescaled[pred_rescaled < 0] = 0  # Clamp negatives
     prediction = pred_rescaled.flatten().tolist()
     df = pd.DataFrame({
         "Time Step": range(1, output_steps+1),
@@ -194,7 +170,7 @@ def upload_monthly():
         file.save(file_path)
         updated_model, scaler_y, X_seq = update_model_monthly(file_path)
         if X_seq.shape[0] == 0:
-            return jsonify({"error": "Not enough data for monthly prediction update. At least {} rows required.".format(720+720)})
+            return jsonify({"error": f"Not enough data for monthly prediction update. Need at least {720+720} rows."})
         prediction = predict_next_monthly(updated_model, scaler_y, X_seq)
         df = pd.DataFrame({
             "Time Step": range(1, len(prediction)+1),
@@ -202,6 +178,60 @@ def upload_monthly():
         })
         df.to_csv("monthly_predictions.csv", index=False)
         return jsonify({"monthly_prediction": prediction})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# ---------------------- Daily Endpoints ----------------------
+@app.route('/predict_daily', methods=['GET'])
+def predict_daily():
+    try:
+        file_path = 'Energy_2022-2024_testing_data.csv'
+        input_steps = 24
+        output_steps = 24
+        X, _, scaler_y_daily = preprocess_data_daily(file_path, input_steps, output_steps)
+        n_features = X.shape[2]
+        base_input = X[-1].copy()
+        data = pd.read_csv(file_path, skiprows=7)
+        if "Timestamp" not in data.columns:
+            data.columns = ["Timestamp", "Electricity Power (kW)", "Air Pressure Power (kW)", "Air Consumption (kW)"]
+        data['Timestamp'] = pd.to_datetime(data['Timestamp'])
+        data = data[data['Timestamp'].dt.minute == 0]
+        last_date = data['Timestamp'].max()
+        next_month_days = 31
+        future_inputs = []
+        for d in range(next_month_days):
+            new_input = base_input.copy()
+            for i in range(24):
+                new_time = last_date + timedelta(days=d+1, hours=i - (24-1))
+                new_input[i, 3] = new_time.hour / 23.0
+                new_input[i, 4] = new_time.weekday() / 6.0
+                new_input[i, 5] = new_time.month / 12.0
+            future_inputs.append(new_input)
+        future_inputs = np.array(future_inputs)
+        preds_scaled = daily_model.predict(future_inputs)
+        preds = np.array([scaler_y_daily.inverse_transform(day_pred.reshape(-1,1)).flatten() for day_pred in preds_scaled])
+        predictions = {f"day_{d+1}": preds[d].tolist() for d in range(next_month_days)}
+        return jsonify(predictions)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/upload_daily', methods=['POST'])
+def upload_daily():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part in request"}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({"error": "No file selected for uploading"}), 400
+    try:
+        os.makedirs('uploads', exist_ok=True)
+        file_path = os.path.join('uploads', file.filename)
+        file.save(file_path)
+        updated_model, scaler_y_daily, X_seq_daily = update_model_daily(file_path)
+        predictions = predict_next_month_daily(updated_model, scaler_y_daily, X_seq_daily)
+        updated_model.save("daily_energy_prediction_model.h5")
+        global daily_model
+        daily_model = updated_model
+        return jsonify(predictions)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
