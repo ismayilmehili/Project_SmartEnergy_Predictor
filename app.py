@@ -6,12 +6,17 @@ import tensorflow as tf
 from sklearn.preprocessing import MinMaxScaler
 from datetime import timedelta
 
-# Import helper functions from update.py
+# Register the DTypePolicy so that Keras can deserialize it.
+from tensorflow.keras.mixed_precision import Policy
+tf.keras.utils.get_custom_objects()['DTypePolicy'] = Policy
+
+# Import helper functions and our custom InputLayer from update.py
 from update import (
     preprocess_data, preprocess_data_monthly_custom,
     update_model, predict_next_month,
     update_model_monthly, predict_next_monthly,
-    preprocess_data_daily, update_model_daily, predict_next_month_daily
+    preprocess_data_daily, update_model_daily, predict_next_month_daily,
+    CustomInputLayer
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -21,15 +26,16 @@ app.secret_key = 'supersecretkey'
 
 print("✅ Flask is using template folder:", TEMPLATE_DIR)
 
-# Load models
-weekly_model = tf.keras.models.load_model('saved_model.h5')
+# Load models with compile=False and using our custom InputLayer
+weekly_model = tf.keras.models.load_model('saved_model.h5', compile=False, custom_objects={'InputLayer': CustomInputLayer})
 print("Weekly model loaded successfully.")
 
-monthly_model = tf.keras.models.load_model('monthly_model.h5')
+monthly_model = tf.keras.models.load_model('monthly_model.h5', compile=False, custom_objects={'InputLayer': CustomInputLayer})
 print("Monthly model loaded successfully.")
 
 daily_model = tf.keras.models.load_model('daily_energy_prediction_model.h5',
-                                         custom_objects={'mse': tf.keras.losses.mse})
+                                         compile=False,
+                                         custom_objects={'mse': tf.keras.losses.mse, 'InputLayer': CustomInputLayer})
 print("Daily model loaded successfully.")
 
 # ---------------------- Main Navigation ----------------------
@@ -236,5 +242,5 @@ def upload_daily():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=int(os.environ.get('PORT', 5001)))
-
+    print("🚀 Starting Flask server... Access it at: http://127.0.0.1:5001/")
+    app.run(host='0.0.0.0', port=5001, debug=True)

@@ -7,6 +7,15 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping
 from sklearn.preprocessing import MinMaxScaler
 from datetime import timedelta
+from tensorflow.keras.layers import InputLayer as OriginalInputLayer
+
+# Custom InputLayer to fix the "batch_shape" issue.
+class CustomInputLayer(OriginalInputLayer):
+    def __init__(self, **kwargs):
+        if 'batch_shape' in kwargs:
+            # Rename 'batch_shape' to 'batch_input_shape'
+            kwargs['batch_input_shape'] = kwargs.pop('batch_shape')
+        super().__init__(**kwargs)
 
 ############################
 # WEEKLY FUNCTIONS
@@ -48,7 +57,7 @@ def update_model(data_file, model_file='saved_model.h5', input_steps=168, output
     X_seq, y_seq, scaler_y = preprocess_data(data_file, input_steps, output_steps)
     n_features = X_seq.shape[2]
     if os.path.exists(model_file):
-        model = load_model(model_file)
+        model = load_model(model_file, custom_objects={'InputLayer': CustomInputLayer})
         print("Loaded existing weekly model from", model_file)
     else:
         raise FileNotFoundError(f"{model_file} not found.")
@@ -122,7 +131,7 @@ def update_model_monthly(data_file, model_file='monthly_model.h5', input_steps=7
         raise ValueError("Not enough data for monthly predictions. At least {} rows are required.".format(input_steps+output_steps))
     n_features = X_seq.shape[2]
     if os.path.exists(model_file):
-        model = load_model(model_file)
+        model = load_model(model_file, custom_objects={'InputLayer': CustomInputLayer})
         print("Loaded existing monthly model from", model_file)
     else:
         raise FileNotFoundError(f"{model_file} not found.")
@@ -186,7 +195,7 @@ def update_model_daily(data_file, model_file='daily_energy_prediction_model.h5',
     X_seq, y_seq, scaler_y = preprocess_data_daily(data_file, input_steps, output_steps)
     n_features = X_seq.shape[2]
     if os.path.exists(model_file):
-        model = load_model(model_file, custom_objects={'mse': tf.keras.losses.mse})
+        model = load_model(model_file, custom_objects={'mse': tf.keras.losses.mse, 'InputLayer': CustomInputLayer})
         print("Loaded existing daily model from", model_file)
     else:
         raise FileNotFoundError(f"{model_file} not found.")
