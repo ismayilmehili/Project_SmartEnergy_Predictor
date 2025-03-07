@@ -131,7 +131,8 @@
     let chart;
     async function getMonthlyPrediction() {
       try {
-        const response = await fetch('/predict_monthly');
+        // Updated endpoint: /monthly/predict_monthly
+        const response = await fetch('/monthly/predict_monthly');
         const result = await response.json();
         if(result.error){
           alert(result.error);
@@ -176,7 +177,8 @@
     }
     
     function downloadMonthly() {
-      window.location.href = '/download_monthly';
+      // Updated endpoint: /monthly/download_monthly
+      window.location.href = '/monthly/download_monthly';
     }
     
     document.getElementById('uploadFormMonthly').addEventListener('submit', async function(e) {
@@ -191,7 +193,8 @@
       const formData = new FormData();
       formData.append('file', fileInput.files[0]);
       try {
-        const response = await fetch('/upload_monthly', { method: 'POST', body: formData });
+        // Updated endpoint: /monthly/upload_monthly
+        const response = await fetch('/monthly/upload_monthly', { method: 'POST', body: formData });
         const result = await response.json();
         if (result.error) {
           alert("Error: " + result.error);

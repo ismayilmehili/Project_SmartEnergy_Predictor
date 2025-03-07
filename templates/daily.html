@@ -149,14 +149,14 @@
   <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
   <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.bundle.min.js"></script>
   
-  <!-- The existing script remains unchanged -->
   <script>
     let dailyPredictions = {};
     let dailyChart;
     
     async function getDailyPrediction() {
       try {
-        const response = await fetch('/predict_daily');
+        // Note the updated URL with /daily prefix
+        const response = await fetch('/daily/predict_daily');
         const predictions = await response.json();
         if (predictions.error) {
           alert("Error: " + predictions.error);
@@ -282,11 +282,13 @@
       const formData = new FormData();
       formData.append('file', fileInput.files[0]);
       try {
-        const response = await fetch('/upload_daily', { method: 'POST', body: formData });
+        // Note the updated URL with /daily prefix
+        const response = await fetch('/daily/upload_daily', { method: 'POST', body: formData });
         const result = await response.json();
         if(result.error){
           alert("Error: " + result.error);
         } else {
+          // After upload, fetch the updated predictions
           getDailyPrediction();
         }
       } catch (error) {
