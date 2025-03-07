@@ -68,8 +68,8 @@
         <a href="/daily" class="btn btn-success nav-btn">Daily Predictions</a>
       </div>
       <div class="mt-5">
-        <!-- Image loaded from the static folder -->
-        <img src="/static/analysis.png" alt="Statistical Analysis" class="analysis-img">
+        <!-- Image loaded using url_for to reference the static folder -->
+        <img src="{{ url_for('static', filename='analysis.png') }}" alt="Statistical Analysis" class="analysis-img">
         <p>Discover trends and insights with our comprehensive statistical analysis.</p>
       </div>
     </div>

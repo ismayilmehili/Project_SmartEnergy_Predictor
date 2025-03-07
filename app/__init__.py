@@ -3,7 +3,10 @@ import os
 from flask import Flask, render_template
 
 def create_app():
-    app = Flask(__name__, template_folder=os.path.join(os.getcwd(), 'templates'))
+    # Set template and static folders to use the project root directories.
+    app = Flask(__name__,
+                template_folder=os.path.join(os.getcwd(), 'templates'),
+                static_folder=os.path.join(os.getcwd(), 'static'))
     app.secret_key = 'supersecretkey'
     
     # Import and register Blueprints
