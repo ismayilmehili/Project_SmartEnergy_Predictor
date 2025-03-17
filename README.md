@@ -7,6 +7,14 @@ Smart Energy Predictor is a Flask-based web application that leverages LSTM mode
 
 ## Features
 
+
+- **Daily Predictions (24-Hour Forecast):**
+Forecasts energy consumption on a 24-hour basis using an LSTM model that leverages the previous 24 hours of data to predict the next 24 hours.
+
+-**Input Steps: 24**
+-**Output Steps: 24**
+-**Required Rows: 48**
+
 - **Weekly Predictions:**  
   Forecasts energy consumption for the upcoming 4 weeks using an LSTM model.  
   - **Input Steps:** 168  
@@ -51,3 +59,11 @@ Smart Energy Predictor is a Flask-based web application that leverages LSTM mode
    ```bash
    git clone https://github.com/ismayilmehili/Project_SmartEnergyPredictor.git
    cd Project_SmartEnergyPredictor
+
+-**Install Dependencies:**
+ pip install -r requirements.txt or creating virtual conda environment
+
+
+-**Run the Flask Server:**
+ python run.py
+
