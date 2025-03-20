@@ -1,69 +1,103 @@
 # Smart Energy Predictor
 
-Smart Energy Predictor is a Flask-based web application that leverages LSTM models to forecast electricity power consumption on both a weekly and monthly basis. The application allows users to update models by uploading new CSV files and provides predictions along with analysis reports.
+**Smart Energy Predictor** is a Flask-based web application leveraging pre-trained LSTM models to forecast electricity consumption. It provides comprehensive daily, weekly, and monthly predictions, along with data analysis capabilities and convenient model updating via CSV uploads.
 
-## Repository Link
-[Project_SmartEnergyPredictor](https://github.com/ismayilmehili/Project_SmartEnergyPredictor.git)
+## Table of Contents
+
+- [Features](#features)
+- [Project Structure](#project-structure)
+- [Installation](#installation)
+- [Usage](#usage)
+- [API Testing](#api-testing)
+- [Future Enhancements](#future-enhancements)
+- [License](#license)
 
 ## Features
 
+- **Daily Predictions (24-Hour Forecast)**
+  - Predict hourly electricity consumption for the next day.
+  - **Input Steps:** 24 | **Output Steps:** 24
+  - **Minimum Data Required:** 48 rows
 
-- **Daily Predictions (24-Hour Forecast):**
-Forecasts energy consumption on a 24-hour basis using an LSTM model that leverages the previous 24 hours of data to predict the next 24 hours.
+- **Weekly Predictions (4-Week Forecast)**
+  - Generate weekly forecasts (hourly predictions for each week).
+  - **Input Steps:** 168 | **Output Steps:** 168
+  - **Minimum Data Required:** 336 rows
 
--**Input Steps: 24**
--**Output Steps: 24**
--**Required Rows: 48**
+- **Monthly Predictions (Upcoming Month Forecast)**
+  - Predict next month's consumption using advanced features (lags, moving averages, interactions).
+  - **Input Steps:** 720 | **Output Steps:** 720
+  - **Minimum Data Required:** 1440 rows
 
-- **Weekly Predictions:**  
-  Forecasts energy consumption for the upcoming 4 weeks using an LSTM model.  
-  - **Input Steps:** 168  
-  - **Output Steps:** 168  
-  - **Required Rows:** 336
+- **Model Updates via CSV**
+  - Easily update daily, weekly, and monthly prediction models using dedicated CSV upload endpoints.
 
-- **Monthly Predictions:**  
-  Predicts the next month's energy consumption with additional engineered features (lag features, moving averages, interaction terms).  
-  - **Input Steps:** 720  
-  - **Output Steps:** 720  
-  - **Required Rows:** 1440
+- **Data Analysis & Reporting**
+  - Generate and download CSV reports containing prediction statistics (mean, min, max).
 
-- **Model Updates:**  
-  Update both weekly and monthly models using new CSV uploads through dedicated endpoints.
+## Installation
 
-- **Data Analysis and Reporting:**  
-  Generates downloadable CSV reports containing predictions and statistical analysis (mean, min, max values).
+### Step 1: Clone Repository
+```bash
+git clone https://github.com/ismayilmehili/Project_SmartEnergyPredictor.git
+cd Project_SmartEnergyPredictor
+```
 
-## File Structure
+### Step 2: Set up Virtual Environment
 
-- `app.py`  
-  Main Flask application handling routes for predictions, uploads, downloads, and analysis.
+**Linux/macOS:**
+```bash
+python -m venv venv
+source venv/bin/activate
+```
 
-- `update.py`  
-  Contains functions for data preprocessing, updating the models, and sequence creation.
+**Windows:**
+```bash
+python -m venv venv
+venv\Scripts\activate
+```
 
-- `main.py`  
-  Entry point for running the Flask server.
+### Step 3: Install Dependencies
+```bash
+pip install -r requirements.txt
+```
 
-- `templates/`  
-  HTML templates for the web interface.
+### Step 4: Add Pre-trained Models
+Place the following TensorFlow models into the `models/` directory:
+- `daily_energy_prediction_model.h5`
+- `saved_model.h5` (weekly predictions)
+- `monthly_model.h5`
 
-- `requirements.txt`  
-  Lists the project dependencies.
+## Usage
 
-- `monthly_model.h5` & `saved_model.h5`  
-  Pre-trained TensorFlow LSTM models for monthly and weekly predictions, respectively.
+### Start the Flask Server
+```bash
+python run.py
+```
 
-## Installation and Setup
+Server starts at: [http://127.0.0.1:5001](http://127.0.0.1:5001)
 
-1. **Clone the Repository:**
-   ```bash
-   git clone https://github.com/ismayilmehili/Project_SmartEnergyPredictor.git
-   cd Project_SmartEnergyPredictor
+### Navigating the Web App
+- **Dashboard:** Select Daily, Weekly, or Monthly prediction views.
 
--**Install Dependencies:**
- pip install -r requirements.txt or creating virtual conda environment
+- **Daily Predictions:**
+  - Upload CSV to update daily model.
+  - View forecasts and download detailed reports.
 
+- **Weekly Predictions:**
+  - Upload CSV to refresh weekly model.
+  - Analyze weekly trends and download individual or aggregate reports.
 
--**Run the Flask Server:**
- python run.py
+- **Monthly Predictions:**
+  - Upload CSV to update monthly forecasts.
+  - Access detailed monthly predictions and reports.
 
+## API Testing
+Run the included API test script to verify endpoint responses:
+
+```bash
+python testapi.py
+```
+This sends a test GET request to the prediction endpoint and outputs the response JSON.
+
+-------------------------------------------------------------------------------------------------
