@@ -8,7 +8,6 @@
 - [Installation](#installation)
 - [Usage](#usage)
 - [API Testing](#api-testing)
-- [License](#license)
 
 ## Features
 
