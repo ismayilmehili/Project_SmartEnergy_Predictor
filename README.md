@@ -5,11 +5,9 @@
 ## Table of Contents
 
 - [Features](#features)
-- [Project Structure](#project-structure)
 - [Installation](#installation)
 - [Usage](#usage)
 - [API Testing](#api-testing)
-- [Future Enhancements](#future-enhancements)
 - [License](#license)
 
 ## Features
